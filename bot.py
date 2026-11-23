@@ -29,45 +29,51 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ========== تنظیمات API ==========
-BINANCE_URL = "https://api.binance.com/api/v3/ticker/24hr"
+COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
 REQUEST_TIMEOUT = 10.0
 
 
 # ========== تابع مشترک دریافت و قالب‌بندی قیمت ==========
 async def fetch_btc_price() -> str:
-    """قیمت لحظه‌ای بیت‌کوین را از بایننس می‌گیرد و متن آماده برمی‌گرداند."""
-    params = {"symbol": "BTCUSDT"}
+    """قیمت لحظهای بیتکوین را از CoinGecko میگیرد."""
+    params = {
+        "ids": "bitcoin",
+        "vs_currencies": "usd",
+        "include_24hr_change": "true",
+        "include_24hr_vol": "true",
+        "include_high_24h": "true",
+        "include_low_24h": "true",
+    }
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        response = await client.get(BINANCE_URL, params=params)
+        response = await client.get(COINGECKO_URL, params=params)
         response.raise_for_status()
         data = response.json()
 
-    price = float(data["lastPrice"])
-    change = float(data["priceChangePercent"])
-    high = float(data["highPrice"])
-    low = float(data["lowPrice"])
-    volume = float(data["quoteVolume"])  # حجم ۲۴ ساعته به USDT
+    btc = data["bitcoin"]
+    price = btc["usd"]
+    change = btc.get("usd_24h_change", 0)
+    high = btc.get("usd_24h_high", price)
+    low = btc.get("usd_24h_low", price)
+    volume = btc.get("usd_24h_vol", 0)
 
-    arrow = "📈" if change >= 0 else "📉"
-    sign = "+" if change >= 0 else ""
     trend_emoji = "🟢" if change >= 0 else "🔴"
+    sign = "+" if change >= 0 else ""
 
-    text = (
+    return (
         "┌──────────────────────────────┐\n"
-        "│   ₿  **BTC / USDT — Live**       │\n"
+        "│   ₿  **BTC / USD — Live**       │\n"
         "└──────────────────────────────┘\n\n"
-        f"💵 **قیمت لحظه‌ای:**  `${price:,.2f}`\n\n"
+        f"💵 **قیمت لحظهای:**  `${price:,.2f}`\n\n"
         f"{trend_emoji} **تغییر ۲۴ ساعته:**  `{sign}{change:.2f}%`\n\n"
         "─────────── ۲۴ ساعت گذشته ───────────\n"
         f"📈 **بالاترین:**  `${high:,.2f}`\n"
-        f"📉 **پایین‌ترین:**  `${low:,.2f}`\n"
+        f"📉 **پایینترین:**  `${low:,.2f}`\n"
         f"📊 **حجم معاملات:**  `${volume:,.0f}`\n\n"
         "─────────── منبع داده ───────────\n"
-        "🔗 **Binance Spot API**\n"
-        "⏱ به‌روزرسانی: لحظه‌ای"
+        "🔗 **CoinGecko API**\n"
+        "⏱ بهروزرسانی: لحظهای"
     )
-    return text
 
 
 # ========== دستور /start ==========
